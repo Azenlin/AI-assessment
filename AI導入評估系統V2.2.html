@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>製造業 AI 導入快篩系統 | Offline Assessment Tool</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        /* Print Specific Styles */
+        @media print {
+            body { background-color: white; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            .page-break { page-break-before: always; }
+            .card-shadow { box-shadow: none !important; border: 1px solid #e2e8f0; }
+            #result-view { padding-top: 0; }
+        }
+
+        .option-card:hover {
+            border-color: #0ea5e9;
+            background-color: #f0f9ff;
+        }
+        .option-card.selected {
+            border-color: #0284c7;
+            background-color: #e0f2fe;
+            position: relative;
+        }
+        .option-card.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #0284c7;
+            font-weight: bold;
+        }
+        
+        /* Transition utility */
+        .fade-in {
+            animation: fadeIn 0.4s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50 no-print">
+        <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i data-lucide="cpu" class="text-brand-600 h-6 w-6"></i>
+                <h1 class="font-bold text-lg text-slate-800">製造業 AI 導入快篩系統</h1>
+            </div>
+            <div class="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                彰化縣政府企業AI及淨零導入健檢分析 v2.2
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow flex flex-col items-center justify-center p-4">
+        
+        <div id="welcome-view" class="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-8 md:p-12 fade-in text-center">
+            <div class="mb-6 flex justify-center">
+                <div class="bg-brand-100 p-4 rounded-full">
+                    <i data-lucide="bar-chart-big" class="text-brand-600 h-10 w-10"></i>
+                </div>
+            </div>
+            <h2 class="text-3xl font-bold mb-4 text-slate-900">8分鐘，預測您的 AI 轉型成功率</h2>
+            <p class="text-slate-600 mb-8 text-lg leading-relaxed">
+                這是專為製造業設計的輕量級評估工具。不需要提供敏感數據，透過 12-20 道問題，
+                系統將自動生成一份包含<span class="font-bold text-brand-600">成熟度雷達圖</span>、
+                <span class="font-bold text-brand-600">風險清單</span>與<span class="font-bold text-brand-600">90天落地建議</span>的分析報告。
+            </p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-left">
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                    <div class="flex items-center gap-2 mb-2 font-bold text-slate-700">
+                        <i data-lucide="zap" class="h-4 w-4 text-amber-500"></i> 快速診斷
+                    </div>
+                    <p class="text-sm text-slate-500">排除繁瑣細節，僅聚焦決策所需的關鍵指標。</p>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                    <div class="flex items-center gap-2 mb-2 font-bold text-slate-700">
+                        <i data-lucide="shield-check" class="h-4 w-4 text-emerald-500"></i> 安全隱私
+                    </div>
+                    <p class="text-sm text-slate-500">純離線運作，資料不傳輸上雲，無需統編。</p>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                    <div class="flex items-center gap-2 mb-2 font-bold text-slate-700">
+                        <i data-lucide="file-spreadsheet" class="h-4 w-4 text-green-600"></i> 完整記錄
+                    </div>
+                    <p class="text-sm text-slate-500">測驗結束可匯出 Excel 原始問答記錄檔。</p>
+                </div>
+            </div>
+
+            <button onclick="app.startQuiz()" class="bg-brand-600 hover:bg-brand-700 text-white text-lg font-semibold py-4 px-10 rounded-full shadow-lg transition transform hover:scale-105 flex items-center gap-2 mx-auto">
+                開始評估 <i data-lucide="arrow-right" class="h-5 w-5"></i>
+            </button>
+        </div>
+
+        <div id="quiz-view" class="w-full max-w-3xl hidden">
+            <div class="mb-6">
+                <div class="flex justify-between text-sm text-slate-500 mb-2 font-medium">
+                    <span id="progress-text">Question 1 of 12</span>
+                    <span id="dimension-tag" class="text-brand-600">基本輪廓</span>
+                </div>
+                <div class="w-full bg-slate-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-brand-600 h-2.5 rounded-full transition-all duration-300" style="width: 10%"></div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden fade-in">
+                <div class="p-6 md:p-8">
+                    <h3 id="question-title" class="text-xl md:text-2xl font-bold text-slate-800 mb-2"></h3>
+                    <p id="question-desc" class="text-slate-500 text-sm mb-6"></p>
+
+                    <div id="options-container" class="space-y-3">
+                        </div>
+                </div>
+                <div class="bg-slate-50 px-6 py-4 flex justify-between items-center border-t border-slate-100">
+                    <button id="prev-btn" onclick="app.prevQuestion()" class="text-slate-500 hover:text-slate-700 font-medium disabled:opacity-30 disabled:cursor-not-allowed px-4 py-2">
+                        上一題
+                    </button>
+                    <button id="next-btn" onclick="app.nextQuestion()" class="bg-slate-800 hover:bg-slate-900 text-white font-medium py-2 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed shadow transition">
+                        下一題
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="result-view" class="w-full max-w-5xl hidden pb-12">
+            
+            <div class="bg-white rounded-xl shadow-lg border border-slate-200 p-8 mb-6 card-shadow print:shadow-none print:border-none">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-100 pb-4">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-900">AI 導入評估報告</h2>
+                        <p class="text-slate-500 mt-1">生成時間: <span id="report-date"></span></p>
+                    </div>
+                    <div class="mt-4 md:mt-0 flex gap-3 no-print">
+                        <button onclick="app.exportExcel()" class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white border border-transparent rounded-lg hover:bg-green-700 font-medium transition shadow-sm">
+                            <i data-lucide="file-spreadsheet" class="h-4 w-4"></i> 匯出 Excel
+                        </button>
+                        <button onclick="window.print()" class="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 font-medium transition">
+                            <i data-lucide="printer" class="h-4 w-4"></i> 列印 / PDF
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="col-span-1 flex flex-col justify-center items-center text-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <div class="text-sm text-slate-500 font-semibold uppercase tracking-wide mb-2">綜合準備度</div>
+                        <div class="relative flex items-center justify-center">
+                            <svg class="transform -rotate-90 w-32 h-32">
+                                <circle cx="64" cy="64" r="60" stroke="#e2e8f0" stroke-width="8" fill="transparent" />
+                                <circle id="score-circle" cx="64" cy="64" r="60" stroke="#0ea5e9" stroke-width="8" fill="transparent" stroke-dasharray="377" stroke-dashoffset="377" class="transition-all duration-1000" />
+                            </svg>
+                            <span id="total-score" class="absolute text-4xl font-bold text-slate-800">0</span>
+                        </div>
+                        <div id="tier-badge" class="mt-4 px-4 py-1 bg-brand-100 text-brand-700 rounded-full font-bold text-sm inline-block">
+                            Tier 0
+                        </div>
+                        <p id="confidence-text" class="text-xs text-slate-400 mt-2">資料可信度: 100%</p>
+                    </div>
+
+                    <div class="col-span-2 flex justify-center items-center h-64">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 page-break">
+                <div class="bg-white rounded-xl shadow-lg border border-slate-200 p-6 card-shadow h-full">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i data-lucide="lightbulb" class="text-amber-500 h-6 w-6"></i>
+                        <h3 class="text-xl font-bold text-slate-800">優先場景建議</h3>
+                    </div>
+                    <ul id="recommendation-list" class="space-y-4">
+                        </ul>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg border border-slate-200 p-6 card-shadow h-full">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i data-lucide="alert-triangle" class="text-red-500 h-6 w-6"></i>
+                        <h3 class="text-xl font-bold text-slate-800">關鍵缺口與風險 (Red Flags)</h3>
+                    </div>
+                    <ul id="risk-list" class="space-y-3">
+                        </ul>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg border border-slate-200 p-6 card-shadow page-break">
+                <div class="flex items-center gap-2 mb-6">
+                    <i data-lucide="map" class="text-brand-600 h-6 w-6"></i>
+                    <h3 class="text-xl font-bold text-slate-800">建議 90 天落地路線圖</h3>
+                </div>
+                <div class="relative border-l-2 border-brand-200 ml-3 space-y-8 pb-4">
+                    
+                    <div class="mb-8 ml-6 relative">
+                        <span class="absolute -left-[31px] bg-brand-500 h-4 w-4 rounded-full border-4 border-white ring-2 ring-brand-100"></span>
+                        <h4 class="flex items-center mb-1 text-lg font-bold text-slate-900">
+                            Month 1: 盤點與規劃 <span class="ml-2 text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">Weeks 1-4</span>
+                        </h4>
+                        <p id="roadmap-m1" class="text-slate-600 text-sm">詳細內容載入中...</p>
+                    </div>
+
+                    <div class="mb-8 ml-6 relative">
+                        <span class="absolute -left-[31px] bg-brand-500 h-4 w-4 rounded-full border-4 border-white ring-2 ring-brand-100"></span>
+                        <h4 class="flex items-center mb-1 text-lg font-bold text-slate-900">
+                            Month 2: 原型驗證 (PoC) <span class="ml-2 text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">Weeks 5-8</span>
+                        </h4>
+                        <p id="roadmap-m2" class="text-slate-600 text-sm">詳細內容載入中...</p>
+                    </div>
+
+                    <div class="ml-6 relative">
+                        <span class="absolute -left-[31px] bg-brand-500 h-4 w-4 rounded-full border-4 border-white ring-2 ring-brand-100"></span>
+                        <h4 class="flex items-center mb-1 text-lg font-bold text-slate-900">
+                            Month 3: 試運行與評估 <span class="ml-2 text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">Weeks 9-12</span>
+                        </h4>
+                        <p id="roadmap-m3" class="text-slate-600 text-sm">詳細內容載入中...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center mt-8 no-print">
+                 <button onclick="location.reload()" class="text-slate-500 hover:text-slate-800 underline text-sm">
+                    重新開始測驗
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const app = {
+            state: {
+                currentStep: 0,
+                answers: {}, // Stores value 0-4
+                quizQueue: [], // The active list of questions
+                totalQuestions: 0,
+                unknownCount: 0,
+                reportData: {} // Store calculated scores for export
+            },
+            
+            // Database of Questions
+            data: {
+                core: [
+                    // Section A: Profile (Not scored in Dimensions, used for logic/benchmarking)
+                    { id: 'q_size', cat: 'PROFILE', text: '公司員工規模', desc: '這將影響我們對您資源投入的預期標準。', options: [
+                        { label: '小於 50 人', val: 1 }, { label: '50 - 199 人', val: 2 }, { label: '200 - 999 人', val: 3 }, { label: '1000 人以上', val: 4 }
+                    ]},
+                    { id: 'q_type', cat: 'PROFILE', text: '主要製造型態', desc: '影響場景推薦邏輯。', options: [
+                        { label: '離散製造 (組裝/加工)', val: 1 }, { label: '流程製造 (化工/食品)', val: 2 }, { label: '混合型', val: 3 }, { label: '不確定', val: 0 }
+                    ]},
+                    // Section B: Data & System (D, I)
+                    { id: 'q_data_acq', cat: 'D', text: '產線/設備資料取得方式', desc: '資料是 AI 的燃料。', options: [
+                        { label: '全人工抄寫 / 紙本', val: 0 }, { label: '部分自動化 (Excel/CSV)', val: 1 }, { label: '多數設備已聯網可視化 (SCADA)', val: 3 }, { label: '即時雙向控制 / API 完善', val: 4 }, { label: '不知道/不確定', val: 0, unknown: true }
+                    ]},
+                    { id: 'q_system', cat: 'D', text: '關鍵系統整合度 (ERP/MES)', desc: '系統是否為資料孤島？', options: [
+                        { label: '各系統獨立，無串接', val: 0 }, { label: '部分批次匯出入', val: 1 }, { label: '關鍵系統即時串接', val: 3 }, { label: '具備統一資料平台/戰情室', val: 4 }, { label: '不知道', val: 0, unknown: true }
+                    ]},
+                    { id: 'q_data_qual', cat: 'D', text: '資料品質與治理', desc: 'Garbage In, Garbage Out.', options: [
+                        { label: '缺漏多 / 格式不統一', val: 0 }, { label: '有人整理但不成標準', val: 1 }, { label: '有定義標準但未落實', val: 2 }, { label: '有治理機制與品質監控', val: 4 }, { label: '不知道', val: 0, unknown: true }
+                    ]},
+                    { id: 'q_infra', cat: 'I', text: 'AI 運算與部署環境', desc: '導入模型後需要在哪裡跑？', options: [
+                        { label: '無 / 一般文書電腦', val: 0 }, { label: '地端伺服器 (僅具 CPU 運算)', val: 1 }, { label: '地端伺服器 (具備 GPU )', val: 3 }, { label: '雲端 GPU 租用', val: 3 }, { label: '混合雲架構 + 邊緣運算', val: 4 }, { label: '不知道', val: 0, unknown: true }
+                    ]},
+                    // Section C: People (P)
+                    { id: 'q_budget', cat: 'P', text: '年度 AI/數位轉型投入', desc: '包含軟硬體與人力成本。', options: [
+                        { label: '無預算', val: 0 }, { label: '專案式小額預算', val: 1 }, { label: '有年度預算但人力不足', val: 2 }, { label: '有專責團隊與穩定預算', val: 4 }, { label: '不知道', val: 0, unknown: true }
+                    ]},
+                    { id: 'q_training', cat: 'P', text: 'AI 教育訓練機制', desc: '組織是否具備學習能力？', options: [
+                        { label: '無', val: 0 }, { label: '鼓勵員工自學', val: 1 }, { label: '有補助外部課程', val: 2 }, { label: '建立內部人才地圖與培訓', val: 4 }, { label: '不知道', val: 0, unknown: true }
+                    ]},
+                    { id: 'q_team', cat: 'P', text: '技術人力配置', desc: '誰來維護這些模型？', options: [
+                        { label: '無', val: 0 }, { label: 'IT 部門兼任', val: 1 }, { label: '有少量資料科學家/工程師', val: 3 }, { label: '獨立 AI/數位轉型部門', val: 4 }, { label: '不知道', val: 0, unknown: true }
+                    ]},
+                    // Section D: Governance (G)
+                    { id: 'q_strategy', cat: 'G', text: 'AI 策略與目標', desc: '為何而戰？', options: [
+                        { label: '無明確目標', val: 0 }, { label: '有數位策略但未含 AI', val: 1 }, { label: '有明確 AI 應用場景', val: 3 }, { label: 'AI 與公司營運 KPI 綁定', val: 4 }, { label: '不知道', val: 0, unknown: true }
+                    ]},
+                    { id: 'q_support', cat: 'G', text: '推動組織與機制', desc: '遇到阻力誰來排除？', options: [
+                        { label: '無', val: 0 }, { label: '部門內小組', val: 1 }, { label: '跨部門任務小組', val: 2 }, { label: '高階主管帶領之委員會', val: 4 }, { label: '不知道', val: 0, unknown: true }
+                    ]},
+                    // Section E: Status (O - Branching point)
+                    { id: 'q_status', cat: 'O', text: '目前 AI 落地程度', desc: '決定接下來的問題方向。', options: [
+                        { label: '尚未規劃', val: 0 }, { label: '探索/研究中', val: 1 }, { label: 'PoC (概念驗證) 中', val: 2 }, { label: '部分場景已上線', val: 3 }, { label: '多個場景落地且常態運作', val: 4 }
+                    ]}
+                ],
+                deepDiveDeployed: [ // Added if q_status >= 2
+                    { id: 's_mlops', cat: 'O', text: 'MLOps 維運成熟度', desc: '模型上線後的管理。', options: [
+                        { label: '人工手動調整 (反應慢)', val: 0 }, { label: '具備標準更新 SOP (半自動)', val: 2 }, { label: '全自動化重訓與換裝流程 (管線化)', val: 4 }, { label: '不知道', val: 0, unknown: true }
+                    ]},
+                    { id: 's_roi', cat: 'O', text: '效益量化與 ROI', desc: '是否看得到錢？', options: [
+                        { label: '難以量化', val: 0 }, { label: '有初步估算但無驗證', val: 2 }, { label: '有明確財務指標驗證', val: 4 }, { label: '不知道', val: 0, unknown: true }
+                    ]}
+                ],
+                deepDiveEarly: [ // Added if q_status < 2
+                    { id: 's_goal', cat: 'STRAT', text: '首要解決痛點 (多選模擬)', desc: '選擇最優先的一項。', options: [
+                        { label: '降低生產成本/不良率', val: 3 }, { label: '提升產能效率 (OEE)', val: 3 }, { label: '縮短交期/排程優化', val: 3 }, { label: '傳承老師傅經驗', val: 3 }
+                    ]},
+                    { id: 's_barrier', cat: 'STRAT', text: '預期最大阻礙', desc: '我們最擔心什麼？', options: [
+                        { label: '預算不足', val: 0 }, { label: '數據雜亂', val: 0 }, { label: '人才缺乏', val: 0 }, { label: '高層不支持', val: 0 }
+                    ]}
+                ]
+            },
+
+            // --- Core Logic ---
+
+            init: function() {
+                lucide.createIcons();
+                const date = new Date();
+                document.getElementById('report-date').innerText = `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()}`;
+                
+                // --- 修正開始：預算最大題數 ---
+                // 找出哪一條分支比較長
+                const maxBranch = Math.max(this.data.deepDiveDeployed.length, this.data.deepDiveEarly.length);
+                // 設定總題數 = 核心題(12) + 最長分支
+                this.state.estimatedTotal = this.data.core.length + maxBranch;
+                // --- 修正結束 ---
+            },
+
+            startQuiz: function() {
+                document.getElementById('welcome-view').classList.add('hidden');
+                document.getElementById('quiz-view').classList.remove('hidden');
+                
+                // Clone core questions to queue
+                this.state.quizQueue = [...this.data.core];
+                
+                // --- 修正開始：鎖定總題數 ---
+                // 不要用 quizQueue.length，改用我們算好的最大值
+                this.state.totalQuestions = this.state.estimatedTotal; 
+                // --- 修正結束 ---
+                
+                this.renderQuestion();
+            },
+
+            renderQuestion: function() {
+    		const q = this.state.quizQueue[this.state.currentStep];
+    
+   		 // Update UI
+  		  document.getElementById('question-title').innerText = `${this.state.currentStep + 1}. ${q.text}`;
+ 		   document.getElementById('question-desc').innerText = q.desc;
+    
+   		 // Update Dimension Tag
+ 		   const dimMap = {'D': '數據整合', 'I': '基礎設施', 'P': '人才資源', 'G': '治理策略', 'O': '營運落地', 'PROFILE': '基本資訊', 'STRAT': '策略目標'};
+   		 document.getElementById('dimension-tag').innerText = dimMap[q.cat] || '一般';
+
+    		// Update Progress
+    		const pct = ((this.state.currentStep) / this.state.totalQuestions) * 100;
+    		document.getElementById('progress-bar').style.width = `${pct}%`;
+    		document.getElementById('progress-text').innerText = `Question ${this.state.currentStep + 1}`;
+
+    		// Render Options
+    		const container = document.getElementById('options-container');
+    		container.innerHTML = '';
+    
+    		q.options.forEach((opt, idx) => {
+        		const btn = document.createElement('div');
+        		btn.className = `option-card w-full p-4 border rounded-lg cursor-pointer transition flex items-center justify-between group bg-white border-slate-200`;
+        		btn.innerHTML = `<span class="font-medium text-slate-700 group-hover:text-brand-700">${opt.label}</span>`;
+        		btn.onclick = () => this.selectOption(btn, q.id, opt.val, opt.unknown);
+        
+        		// Check if already answered (for navigating back)
+        		if (this.state.answers[q.id] === opt.val) {
+                btn.classList.add('selected');
+        		}
+        		container.appendChild(btn);
+    		});
+
+    		// Update Buttons
+    		document.getElementById('prev-btn').disabled = this.state.currentStep === 0;
+    		document.getElementById('next-btn').disabled = true; // Disable until selected
+    
+    		// --- 修正重點開始 ---
+    		// 預設邏輯：如果是最後一題，顯示「查看報告」
+    		let btnText = (this.state.currentStep === this.state.quizQueue.length - 1) ? '查看報告' : '下一題';
+    
+    		// 強制邏輯：如果是第12題 (q_status)，因為後面還有深挖題，強制顯示「下一題」
+    		if (q.id === 'q_status') {
+        		btnText = '下一題';
+    		}
+    
+    		document.getElementById('next-btn').innerText = btnText;
+    		// --- 修正重點結束 ---
+		},
+
+            selectOption: function(el, qId, val, isUnknown) {
+                // Remove selected class from siblings
+                document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+                el.classList.add('selected');
+                
+                // Save State
+                this.state.answers[qId] = val;
+                if (isUnknown) this.state.unknownCount++; // Simplified logic for demo
+                
+                document.getElementById('next-btn').disabled = false;
+                // setTimeout(() => this.nextQuestion(), 300);
+            },
+
+            nextQuestion: function() {
+                const currentQ = this.state.quizQueue[this.state.currentStep];
+
+                // BRANCHING LOGIC
+                if (currentQ.id === 'q_status') {
+                    const val = this.state.answers['q_status'];
+                    if (val >= 2) {
+                        // Deployed path
+                        const nextQId = this.data.deepDiveDeployed[0].id;
+                        if (!this.state.quizQueue.find(q => q.id === nextQId)) {
+                            this.state.quizQueue = [...this.state.quizQueue, ...this.data.deepDiveDeployed];
+                        }
+                    } else {
+                        // Early stage path
+                        const nextQId = this.data.deepDiveEarly[0].id;
+                        if (!this.state.quizQueue.find(q => q.id === nextQId)) {
+                             this.state.quizQueue = [...this.state.quizQueue, ...this.data.deepDiveEarly];
+                        }
+                    }
+                    // --- 修正開始：刪除以下這行 ---
+                    // 原本這行會導致分母變大，請直接刪除或註解掉
+                    // this.state.totalQuestions = this.state.quizQueue.length;
+                    // --- 修正結束 ---
+                }
+
+                if (this.state.currentStep < this.state.quizQueue.length - 1) {
+                    this.state.currentStep++;
+                    this.renderQuestion();
+                } else {
+                    this.calculateResults();
+                }
+            },
+
+            prevQuestion: function() {
+                if (this.state.currentStep > 0) {
+                    this.state.currentStep--;
+                    this.renderQuestion();
+                }
+            },
+
+            calculateResults: function() {
+                // 1. Calculate Dimension Scores (0-100)
+                // Mapping Questions to Dimensions
+                const map = {
+                    'D': ['q_data_acq', 'q_system', 'q_data_qual'],
+                    'I': ['q_infra'],
+                    'P': ['q_budget', 'q_training', 'q_team'],
+                    'G': ['q_strategy', 'q_support'],
+                    'O': ['q_status', 's_mlops', 's_roi'] // Only present if deployed
+                };
+
+                let scores = { D:0, I:0, P:0, G:0, O:0 };
+                let maxScores = { D:12, I:4, P:12, G:8, O:4 }; // Max possible raw points
+                
+                // Adjust O max score if deep dive questions exist
+                if (this.state.answers['s_mlops'] !== undefined) maxScores.O += 8; // 2 extra Qs * 4
+
+                // Summation
+                for (const [dim, qIds] of Object.entries(map)) {
+                    qIds.forEach(id => {
+                        if (this.state.answers[id] !== undefined) {
+                            scores[dim] += this.state.answers[id];
+                        }
+                    });
+                }
+
+                // Normalize to 100
+                const finalScores = {
+                    D: Math.round((scores.D / maxScores.D) * 100) || 0,
+                    I: Math.round((scores.I / maxScores.I) * 100) || 0,
+                    P: Math.round((scores.P / maxScores.P) * 100) || 0,
+                    G: Math.round((scores.G / maxScores.G) * 100) || 0,
+                    O: Math.round((scores.O / maxScores.O) * 100) || 0
+                };
+
+                // Weighted Total Score
+                // Weights: D(30), I(15), P(20), G(20), O(15)
+                let total = (finalScores.D * 0.3) + (finalScores.I * 0.15) + (finalScores.P * 0.2) + (finalScores.G * 0.2) + (finalScores.O * 0.15);
+                total = Math.round(total);
+
+                // Store for export
+                this.state.reportData = { finalScores, total, tier: '' };
+
+                this.renderResultsPage(finalScores, total);
+            },
+
+            renderResultsPage: function(scores, total) {
+                document.getElementById('quiz-view').classList.add('hidden');
+                document.getElementById('result-view').classList.remove('hidden');
+
+                // Tier Logic
+                let tier = 'Tier 0: 尚未準備';
+                let tierColor = 'bg-slate-100 text-slate-700';
+                if (total >= 20) { tier = 'Tier 1: 基礎自動化'; tierColor = 'bg-blue-100 text-blue-700'; }
+                if (total >= 40) { tier = 'Tier 2: 單點 PoC'; tierColor = 'bg-indigo-100 text-indigo-700'; }
+                if (total >= 60) { tier = 'Tier 3: 跨系統整合'; tierColor = 'bg-purple-100 text-purple-700'; }
+                if (total >= 80) { tier = 'Tier 4: 企業級 AI'; tierColor = 'bg-emerald-100 text-emerald-700'; }
+                
+                this.state.reportData.tier = tier;
+
+                // UI Updates
+                document.getElementById('total-score').innerText = total;
+                document.getElementById('tier-badge').innerText = tier;
+                document.getElementById('tier-badge').className = `mt-4 px-4 py-1 rounded-full font-bold text-sm inline-block ${tierColor}`;
+                
+                const scoreCircle = document.getElementById('score-circle');
+                // 377 is circumference. 
+                const offset = 377 - (377 * total / 100);
+                setTimeout(() => scoreCircle.style.strokeDashoffset = offset, 100);
+
+                // Confidence
+                const confidence = Math.round((1 - (this.state.unknownCount / Object.keys(this.state.answers).length)) * 100);
+                document.getElementById('confidence-text').innerText = `資料可信度: ${confidence}%`;
+
+                // Render Chart
+                this.renderChart(scores);
+                
+                // Generate Dynamic Content
+                this.generateRecommendations(scores, total);
+                this.generateRisks(scores);
+                this.generateRoadmap(total);
+
+                lucide.createIcons();
+            },
+
+            renderChart: function(scores) {
+                const ctx = document.getElementById('radarChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['數據 (Data)', '基建 (Infra)', '人才 (People)', '治理 (Gov)', '營運 (Ops)'],
+                        datasets: [{
+                            label: '您的評分',
+                            data: [scores.D, scores.I, scores.P, scores.G, scores.O],
+                            backgroundColor: 'rgba(14, 165, 233, 0.2)',
+                            borderColor: '#0ea5e9',
+                            pointBackgroundColor: '#0284c7',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                min: 0,
+                                max: 100,
+                                ticks: { stepSize: 20, display: false },
+                                pointLabels: { font: { size: 12, family: 'Inter' } }
+                            }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            },
+
+            generateRecommendations: function(scores, total) {
+                const list = document.getElementById('recommendation-list');
+                const manuType = this.state.answers['q_type'] || 0;
+                let items = [];
+
+                // Rules Engine for Scenarios
+                if (scores.D < 30) {
+                    items.push({icon: 'database', title: '數據基礎建設', desc: '您的數據分數較低，建議先建立機聯網 (IoT) 或數位化表單，累積可用數據。'});
+                }
+                
+                // Manufacturing Type based logic
+                if (manuType === 1) { // Discrete
+                     items.push({icon: 'scan', title: 'AOI 視覺檢測', desc: '離散製造首選：針對關鍵站點導入視覺檢測，快速降低不良流出。'});
+                     if (total > 40) items.push({icon: 'calendar-clock', title: 'APS 排程優化', desc: '若數據充足，導入 AI 排程可顯著縮短交期。'});
+                } else if (manuType === 2) { // Process
+                    items.push({icon: 'activity', title: '製程參數最佳化', desc: '利用歷史參數與良率關聯，建立 AI 推薦模型 (Golden Batch)。'});
+                    items.push({icon: 'zap', title: '能源管理 EMS+AI', desc: '針對高耗能設備進行異常偵測與用電預測。'});
+                } else {
+                    items.push({icon: 'file-text', title: '文件/知識助裡', desc: '利用 GenAI 整理維修手冊與 SOP，降低人員訓練門檻。'});
+                }
+
+                if (scores.P < 40) {
+                     items.push({icon: 'users', title: '賦能種子部隊', desc: '外部工具與人才昂貴，建議挑選內部領域專家 (Domain Expert) 學習 No-code AI 工具。'});
+                }
+
+                // Render
+                list.innerHTML = items.slice(0, 3).map(i => `
+                    <li class="flex items-start gap-3">
+                        <div class="mt-1 bg-brand-50 p-1.5 rounded text-brand-600"><i data-lucide="${i.icon}" class="w-4 h-4"></i></div>
+                        <div>
+                            <strong class="text-slate-700 block text-sm">${i.title}</strong>
+                            <span class="text-xs text-slate-500">${i.desc}</span>
+                        </div>
+                    </li>
+                `).join('');
+            },
+
+            generateRisks: function(scores) {
+                const list = document.getElementById('risk-list');
+                let risks = [];
+
+                // Hard Gating Rules (Red Flags)
+                if (scores.D < 35) risks.push('數據孤島效應：目前資料整合度不足，模型開發成本將有 80% 花在清洗資料。');
+                if (scores.G < 35) risks.push('缺乏治理機制：若無高層支持與明確 KPI，專案容易在 PoC 結束後無疾而終。');
+                if (this.state.answers['q_data_acq'] === 0) risks.push('資料獲取困難：依賴紙本記錄將導致 AI 無法即時推論，需優先解決數位化。');
+                if (scores.I < 30 && this.state.answers['q_infra'] <= 1) risks.push('算力瓶頸：若要導入視覺類應用，目前的運算環境可能需要升級 (雲端或 Edge)。');
+                if (this.state.unknownCount > 3) risks.push('不確定性過高：過多的「不知道」選項意味著現況盤點不清，建議進行詳細顧問診斷。');
+
+                if (risks.length === 0) risks.push('暫無顯著紅旗風險，但需注意模型上線後的持續維運成本。');
+
+                list.innerHTML = risks.slice(0, 4).map(r => `
+                    <li class="text-sm text-slate-600 flex gap-2">
+                        <span class="text-red-500 mt-0.5">•</span> ${r}
+                    </li>
+                `).join('');
+            },
+
+            generateRoadmap: function(total) {
+                let m1, m2, m3;
+
+                if (total < 40) { // Tier 0-1
+                    m1 = "數位化盤點：確認關鍵機台資料可視化程度，建立標準欄位 (Tag naming)。";
+                    m2 = "小規模試點：選擇一個非關鍵流程 (如: 單站良率分析) 進行數據驗證。";
+                    m3 = "建立信心：產出第一份數據洞察報告，向管理層爭取正規預算。";
+                } else if (total < 70) { // Tier 2-3
+                    m1 = "PoC 規格確認：定義明確的成功指標 (Success Criteria) 與驗收標準。";
+                    m2 = "模型開發與調優：進行離線模型訓練，確認準確率與誤報率可接受。";
+                    m3 = "影子模式 (Shadow Mode) 上線：並行運作，讓現場人員習慣 AI 輔助。";
+                } else { // Tier 4
+                    m1 = "MLOps 管道建置：導入自動化再訓練機制，確保模型不過期。";
+                    m2 = "邊緣部署與推論：將模型派送至 Edge 端，降低延遲並提升資安。";
+                    m3 = "全廠擴散：複製成功模式至其他產線，並建立跨廠戰情室。";
+                }
+
+                document.getElementById('roadmap-m1').innerText = m1;
+                document.getElementById('roadmap-m2').innerText = m2;
+                document.getElementById('roadmap-m3').innerText = m3;
+            },
+
+            // --- EXCEL EXPORT LOGIC ---
+            exportExcel: function() {
+                // 1. Prepare Data
+                const rows = [];
+                
+                // Header Row
+                // rows.push(['維度', '問題', '您的選擇', '分數 (0-4)']);
+
+                // Iterate through the quizQueue (which represents the actual path taken)
+                this.state.quizQueue.forEach((q, index) => {
+                    const ansVal = this.state.answers[q.id];
+                    // Find label
+                    const selectedOpt = q.options.find(o => o.val === ansVal);
+                    const label = selectedOpt ? selectedOpt.label : '未作答';
+                    
+                    rows.push({
+                        '題號': index + 1,
+                        '維度分類': q.cat,
+                        '評估問題': q.text,
+                        '選擇答案': label,
+                        '得分': ansVal
+                    });
+                });
+
+                // Add Summary Stats at the bottom
+                rows.push({}); // Empty row
+                rows.push({ '評估問題': '--- 評估結果摘要 ---' });
+                rows.push({ '評估問題': '總分', '選擇答案': this.state.reportData.total });
+                rows.push({ '評估問題': '分級', '選擇答案': this.state.reportData.tier });
+                rows.push({ '評估問題': '填表日期', '選擇答案': new Date().toLocaleDateString() });
+
+                // 2. Create Sheet
+                const worksheet = XLSX.utils.json_to_sheet(rows);
+                
+                // Adjust Column Widths
+                const wscols = [
+                    {wch: 6},  // A: ID
+                    {wch: 10}, // B: Cat
+                    {wch: 40}, // C: Question
+                    {wch: 40}, // D: Answer
+                    {wch: 8}   // E: Score
+                ];
+                worksheet['!cols'] = wscols;
+
+                // 3. Create Workbook and Append Sheet
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "AI評估報告");
+
+                // 4. Export file
+                const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, "");
+                XLSX.writeFile(workbook, `AI_Readiness_Report_${dateStr}.xlsx`);
+            }
+        };
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+
+    </script>
+</body>
+</html>
